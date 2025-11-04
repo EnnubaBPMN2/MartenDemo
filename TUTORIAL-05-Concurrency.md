@@ -100,6 +100,8 @@ catch (ConcurrencyException ex)
 
 ## 📦 Implementing Concurrency Control
 
+> **📝 Note:** The demo application (Chapter 05) uses **Method 4: Attribute-Based** approach, which is the simplest and most recommended for Marten 8.x. This method is shown at the end of this section. Methods 1-3 are shown for educational purposes.
+
 ### **Method 1: Session-Level (All Documents)**
 
 ```csharp
@@ -174,6 +176,56 @@ var updated = account with { Balance = 500 };
 session.Store(updated);
 await session.SaveChangesAsync(); // Throws if version changed
 ```
+
+### **Method 4: Attribute-Based (✅ RECOMMENDED - Used in Demo)**
+
+This is the simplest and most declarative approach, used in the Chapter 05 demo:
+
+```csharp
+using Marten.Schema;
+using Marten.Exceptions;
+
+// 1. Add attribute to your document class
+[UseOptimisticConcurrency]
+public record User
+{
+    public Guid Id { get; init; }
+    public required string Name { get; init; }
+    public required string Email { get; init; }
+}
+
+// 2. Use normally - concurrency is automatic!
+public static async Task UpdateUser(IDocumentStore store, Guid userId)
+{
+    await using var session = store.LightweightSession();
+
+    var user = await session.LoadAsync<User>(userId);
+    var updated = user! with { Name = "New Name" };
+    session.Store(updated);
+
+    try
+    {
+        await session.SaveChangesAsync();
+        Console.WriteLine("Update succeeded ✅");
+    }
+    catch (ConcurrencyException)
+    {
+        Console.WriteLine("Conflict detected! Document was modified by another session ❌");
+        // Handle conflict (retry, merge, notify user, etc.)
+    }
+}
+```
+
+**Why this method is best:**
+- ✅ Declarative - concurrency intent is clear from the class definition
+- ✅ No repetitive session configuration code
+- ✅ Automatic - all operations on this document type are protected
+- ✅ Type-safe - compiler checks the attribute at compile time
+
+**When to use:**
+- Documents that always need concurrency protection (users, accounts, orders)
+- New projects where you can design from the start
+- When you want consistency across your codebase
 
 ---
 
@@ -624,10 +676,26 @@ var result = await RetryOnConflict(async () =>
 
 ## 💡 Best Practices
 
-### **1. Enable Concurrency for Critical Operations**
+### **1. Use Attribute-Based Approach for Document Types (✅ RECOMMENDED)**
 
 ```csharp
-// ✅ GOOD - Protect financial operations
+// ✅ BEST - Use attribute on document class (declarative, always protected)
+[UseOptimisticConcurrency]
+public record BankAccount
+{
+    public Guid Id { get; init; }
+    public string AccountNumber { get; init; } = "";
+    public decimal Balance { get; init; }
+}
+
+// Now all operations are automatically protected
+await using var session = store.LightweightSession();
+var account = await session.LoadAsync<BankAccount>(id);
+var updated = account with { Balance = account.Balance - amount };
+session.Store(updated);
+await session.SaveChangesAsync(); // Automatic concurrency checking
+
+// ✅ ALTERNATIVE - Session-level (for selective protection)
 session.UseOptimisticConcurrency();
 var account = await session.LoadAsync<BankAccount>(id);
 var updated = account with { Balance = account.Balance - amount };

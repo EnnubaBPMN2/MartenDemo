@@ -159,11 +159,19 @@ Prevent lost updates with version-based conflict detection.
 
 **Code Example:**
 ```csharp
-await using var session = store.LightweightSession();
-session.UseOptimisticConcurrency();
+// Add attribute to enable concurrency (simplest approach)
+[UseOptimisticConcurrency]
+public record User
+{
+    public Guid Id { get; init; }
+    public required string Name { get; init; }
+    public required string Email { get; init; }
+}
 
-var account = await session.LoadAsync<BankAccount>(id);
-var updated = account with { Balance = account.Balance - 100 };
+// Now all operations are automatically protected
+await using var session = store.LightweightSession();
+var user = await session.LoadAsync<User>(id);
+var updated = user with { Name = "New Name" };
 session.Store(updated);
 
 try
@@ -172,7 +180,7 @@ try
 }
 catch (ConcurrencyException)
 {
-    // Handle conflict
+    // Handle conflict - document was modified by another session
 }
 ```
 
@@ -219,7 +227,8 @@ Transform event streams into queryable read models.
 
 **Code Example:**
 ```csharp
-public class AccountBalanceProjection : SingleStreamProjection<AccountBalance>
+// Note: Use SingleStreamProjection<TDoc, TId> with TWO type parameters
+public class AccountBalanceProjection : SingleStreamProjection<AccountBalance, Guid>
 {
     public AccountBalance Create(AccountOpened e)
     {
