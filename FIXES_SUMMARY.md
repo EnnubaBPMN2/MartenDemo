@@ -19,18 +19,18 @@ public class MyProjection : ViewProjection<T, TId>        // ❌ Wrong
 
 **✅ Fixed (Correct):**
 ```csharp
-// Use SingleStreamProjection in Marten 8.13.3:
-public class MyProjection : SingleStreamProjection<T>     // ✅ Correct
+// Use SingleStreamProjection<TDoc, TId> in Marten 8.13.3:
+public class MyProjection : SingleStreamProjection<T, Guid>     // ✅ Correct (two type parameters!)
 ```
 
 ### **2. Namespace Issues**
 
 **Correct Namespace:**
 ```csharp
-using Marten.Events.Projections;  // Contains SingleStreamProjection<T>
+using Marten.Events.Aggregation;  // Contains SingleStreamProjection<TDoc, TId>
 ```
 
-**Note:** `ProjectionLifecycle` may be in `JasperFx.Events.Projections` in some versions.
+**Important:** The working namespace is `Marten.Events.Aggregation`, NOT `Marten.Events.Projections`!
 
 ---
 
@@ -57,7 +57,7 @@ using Marten.Events.Projections;  // Contains SingleStreamProjection<T>
 Here's the confirmed working pattern for Marten 8.13.3:
 
 ```csharp
-using Marten.Events.Projections;
+using Marten.Events.Aggregation;  // IMPORTANT: Use this namespace!
 using MartenDemo.EventSourcing.Events;
 
 namespace MartenDemo.EventSourcing.Projections;
@@ -71,32 +71,33 @@ public class AccountBalance
     public DateTime LastModified { get; set; }
 }
 
-// Projection - Extends SingleStreamProjection<T>
-public class AccountBalanceProjection : SingleStreamProjection<AccountBalance>
+// Projection - Extends SingleStreamProjection<TDoc, TId>
+// NOTE: Two type parameters! Document type and ID type
+public class AccountBalanceProjection : SingleStreamProjection<AccountBalance, Guid>
 {
     // Create() - Called when stream starts
-    public AccountBalance Create(AccountOpened e)
+    public AccountBalance Create(AccountOpened evt)
     {
         return new AccountBalance
         {
-            Id = e.AccountId,
-            AccountNumber = e.AccountNumber,
-            Balance = e.InitialBalance,
-            LastModified = e.OpenedAt
+            Id = evt.AccountId,
+            AccountNumber = evt.AccountNumber,
+            Balance = evt.InitialBalance,
+            LastModified = evt.OpenedAt
         };
     }
 
     // Apply() - Called for each subsequent event
-    public void Apply(MoneyDeposited e, AccountBalance view)
+    public void Apply(MoneyDeposited evt, AccountBalance view)
     {
-        view.Balance += e.Amount;
-        view.LastModified = e.DepositedAt;
+        view.Balance += evt.Amount;
+        view.LastModified = evt.DepositedAt;
     }
 
-    public void Apply(MoneyWithdrawn e, AccountBalance view)
+    public void Apply(MoneyWithdrawn evt, AccountBalance view)
     {
-        view.Balance -= e.Amount;
-        view.LastModified = e.WithdrawnAt;
+        view.Balance -= evt.Amount;
+        view.LastModified = evt.WithdrawnAt;
     }
 }
 ```
@@ -164,16 +165,18 @@ The tutorial contains a `MultiStreamProjection` example that hasn't been tested 
 ## 🎓 Key Learnings
 
 ### **For Marten 8.13.3:**
-- ✅ Use `SingleStreamProjection<T>` for single-stream projections
+- ✅ Use `SingleStreamProjection<TDoc, TId>` with TWO type parameters
+- ✅ Use `Marten.Events.Aggregation` namespace (not `Projections`!)
 - ✅ Use `Create()` method for stream initialization
 - ✅ Use `Apply()` methods for event handlers
 - ❌ Don't use `SingleStreamAggregation<T>` (doesn't exist)
 - ❌ Don't use `ViewProjection<T>` (doesn't exist in Marten 8.x)
+- ❌ Don't use `Marten.Events.Projections` namespace (wrong one!)
 
 ### **Namespace Reference:**
 ```csharp
 using Marten;                        // DocumentStore, Sessions
-using Marten.Events.Projections;    // SingleStreamProjection
+using Marten.Events.Aggregation;    // SingleStreamProjection<TDoc, TId>
 using JasperFx;                      // AutoCreate enum
 ```
 
