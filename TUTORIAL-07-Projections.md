@@ -279,38 +279,35 @@ Console.WriteLine($"Total Balance: ${summary?.TotalBalance}");
 
 ---
 
-## 🏗️ ViewProjection (Advanced)
+## 🏗️ Additional Projection Example
 
-More control with `ViewProjection`:
+You can create specialized projections for different views:
 
 ```csharp
-public class AccountListProjection : ViewProjection<AccountListView, Guid>
+public class AccountListProjection : SingleStreamProjection<AccountListView>
 {
-    public AccountListProjection()
+    // Create the view when account is opened
+    public AccountListView Create(AccountOpened e)
     {
-        // Project AccountOpened events
-        ProjectEvent<AccountOpened>((view, evt) =>
+        return new AccountListView
         {
-            view.Id = evt.AccountId;
-            view.AccountNumber = evt.AccountNumber;
-            view.OwnerName = evt.OwnerName;
-            view.Status = "Active";
-            view.CreatedAt = evt.OpenedAt;
-        });
-
-        // Project AccountClosed events
-        ProjectEvent<AccountClosed>((view, evt) =>
-        {
-            view.Status = "Closed";
-            view.ClosedAt = evt.ClosedAt;
-        });
+            Id = e.AccountId,
+            AccountNumber = e.AccountNumber,
+            OwnerName = e.OwnerName,
+            Status = "Active",
+            CreatedAt = e.OpenedAt
+        };
     }
 
-    // Delete projection when account is closed
-    public override bool ShouldDelete(AccountClosed @event)
+    // Update status when account is closed
+    public void Apply(AccountClosed e, AccountListView view)
     {
-        return true; // Remove from list when closed
+        view.Status = "Closed";
+        view.ClosedAt = e.ClosedAt;
     }
+
+    // Can optionally implement ShouldDelete to remove from list
+    public bool ShouldDelete(AccountClosed e) => true;
 }
 
 public class AccountListView
