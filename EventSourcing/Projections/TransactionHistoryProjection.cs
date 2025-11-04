@@ -1,4 +1,4 @@
-using Marten.Events.Projections;
+using Marten.Events.Aggregation;
 using MartenDemo.EventSourcing.Events;
 
 namespace MartenDemo.EventSourcing.Projections;
@@ -6,41 +6,41 @@ namespace MartenDemo.EventSourcing.Projections;
 // Read model for transaction history
 public class TransactionHistory
 {
-    public Guid Id { get; set; } // Account ID
+    public Guid Id { get; set; }
     public string AccountNumber { get; set; } = "";
     public List<Transaction> Transactions { get; set; } = new();
 }
 
 public record Transaction(string Type, decimal Amount, string Description, DateTime When);
 
-// Projection definition
-public class TransactionHistoryProjection : SingleStreamProjection<TransactionHistory>
+// Projection definition using SingleStreamProjection
+public class TransactionHistoryProjection : SingleStreamProjection<TransactionHistory, Guid>
 {
-    public TransactionHistory Create(AccountOpened e)
+    public TransactionHistory Create(AccountOpened evt)
     {
         return new TransactionHistory
         {
-            Id = e.AccountId,
-            AccountNumber = e.AccountNumber,
+            Id = evt.AccountId,
+            AccountNumber = evt.AccountNumber,
             Transactions = new List<Transaction>
             {
-                new("Opened", e.InitialBalance, $"Account opened with initial deposit", e.OpenedAt)
+                new("Opened", evt.InitialBalance, "Account opened with initial deposit", evt.OpenedAt)
             }
         };
     }
 
-    public void Apply(MoneyDeposited e, TransactionHistory view)
+    public void Apply(MoneyDeposited evt, TransactionHistory view)
     {
-        view.Transactions.Add(new Transaction("Deposit", e.Amount, e.Description, e.DepositedAt));
+        view.Transactions.Add(new Transaction("Deposit", evt.Amount, evt.Description, evt.DepositedAt));
     }
 
-    public void Apply(MoneyWithdrawn e, TransactionHistory view)
+    public void Apply(MoneyWithdrawn evt, TransactionHistory view)
     {
-        view.Transactions.Add(new Transaction("Withdrawal", -e.Amount, e.Description, e.WithdrawnAt));
+        view.Transactions.Add(new Transaction("Withdrawal", -evt.Amount, evt.Description, evt.WithdrawnAt));
     }
 
-    public void Apply(AccountClosed e, TransactionHistory view)
+    public void Apply(AccountClosed evt, TransactionHistory view)
     {
-        view.Transactions.Add(new Transaction("Closed", 0, e.Reason, e.ClosedAt));
+        view.Transactions.Add(new Transaction("Closed", 0, evt.Reason, evt.ClosedAt));
     }
 }

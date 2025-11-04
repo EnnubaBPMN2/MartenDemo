@@ -1,11 +1,13 @@
 using Marten;
+using MartenDemo.EventSourcing.Projections;
+using MartenDemo.Models;
 
 namespace MartenDemo.Helpers;
 
 public static class DatabaseReset
 {
     /// <summary>
-    /// Resets all document data (keeps schema)
+    ///     Resets all document data (keeps schema)
     /// </summary>
     public static async Task ResetDocumentsAsync(IDocumentStore store)
     {
@@ -13,13 +15,13 @@ public static class DatabaseReset
 
         // Delete all documents
         session.DeleteWhere<User>(_ => true);
-        session.DeleteWhere<Models.Product>(_ => true);
-        session.DeleteWhere<Models.Order>(_ => true);
-        session.DeleteWhere<Models.Contact>(_ => true);
+        session.DeleteWhere<Product>(_ => true);
+        session.DeleteWhere<Order>(_ => true);
+        session.DeleteWhere<Contact>(_ => true);
 
         // Delete projections
-        session.DeleteWhere<EventSourcing.Projections.AccountBalance>(_ => true);
-        session.DeleteWhere<EventSourcing.Projections.TransactionHistory>(_ => true);
+        session.DeleteWhere<AccountBalance>(_ => true);
+        session.DeleteWhere<TransactionHistory>(_ => true);
 
         await session.SaveChangesAsync();
 
@@ -27,7 +29,7 @@ public static class DatabaseReset
     }
 
     /// <summary>
-    /// Resets all events
+    ///     Resets all events
     /// </summary>
     public static async Task ResetEventsAsync(IDocumentStore store)
     {
@@ -38,7 +40,7 @@ public static class DatabaseReset
     }
 
     /// <summary>
-    /// Complete reset - documents and events
+    ///     Complete reset - documents and events
     /// </summary>
     public static async Task CompleteResetAsync(IDocumentStore store)
     {
@@ -51,7 +53,7 @@ public static class DatabaseReset
     }
 
     /// <summary>
-    /// Drop and recreate all schema objects
+    ///     Drop and recreate all schema objects
     /// </summary>
     public static async Task RecreateSchemaAsync(IDocumentStore store)
     {
@@ -61,7 +63,7 @@ public static class DatabaseReset
         await store.Advanced.Clean.CompletelyRemoveAllAsync();
 
         // Recreate schema
-        await store.Schema.ApplyAllConfiguredChangesToDatabaseAsync();
+        await store.Storage.ApplyAllConfiguredChangesToDatabaseAsync();
 
         Console.WriteLine("✅ Schema recreated");
     }

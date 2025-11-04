@@ -1,14 +1,14 @@
 using Marten;
-using MartenDemo.Models;
-using MartenDemo.EventSourcing.Events;
 using MartenDemo.EventSourcing.Aggregates;
+using MartenDemo.EventSourcing.Events;
+using MartenDemo.Models;
 
 namespace MartenDemo.Helpers;
 
 public static class DataSeeder
 {
     /// <summary>
-    /// Seed sample users
+    ///     Seed sample users
     /// </summary>
     public static async Task SeedUsersAsync(IDocumentStore store, int count = 10)
     {
@@ -18,27 +18,22 @@ public static class DataSeeder
         var names = new[] { "Alice", "Bob", "Charlie", "Diana", "Eve", "Frank", "Grace", "Henry", "Iris", "Jack" };
         var domains = new[] { "example.com", "test.com", "demo.com" };
 
-        for (int i = 0; i < Math.Min(count, names.Length); i++)
-        {
+        for (var i = 0; i < Math.Min(count, names.Length); i++)
             users.Add(new User
             {
                 Id = Guid.NewGuid(),
                 Name = names[i],
                 Email = $"{names[i].ToLower()}@{domains[i % domains.Length]}"
             });
-        }
 
-        foreach (var user in users)
-        {
-            session.Store(user);
-        }
+        foreach (var user in users) session.Store(user);
 
         await session.SaveChangesAsync();
         Console.WriteLine($"✅ Seeded {users.Count} users");
     }
 
     /// <summary>
-    /// Seed sample products
+    ///     Seed sample products
     /// </summary>
     public static async Task SeedProductsAsync(IDocumentStore store, int count = 20)
     {
@@ -54,39 +49,34 @@ public static class DataSeeder
 
         var products = new List<Product>();
 
-        for (int i = 0; i < Math.Min(count, productNames.Length); i++)
-        {
+        for (var i = 0; i < Math.Min(count, productNames.Length); i++)
             products.Add(new Product
             {
                 Id = Guid.NewGuid(),
                 SKU = $"PRD-{1000 + i}",
                 Name = productNames[i],
                 Description = $"High quality {productNames[i].ToLower()} for professionals",
-                Price = Math.Round(Random.Shared.NextDouble() * 500 + 10, 2),
+                Price = (decimal)Math.Round(Random.Shared.NextDouble() * 500 + 10, 2),
                 StockQuantity = Random.Shared.Next(0, 100),
                 Tags = GetRandomTags(),
                 CreatedAt = DateTime.UtcNow.AddDays(-Random.Shared.Next(0, 365))
             });
-        }
 
-        foreach (var product in products)
-        {
-            session.Store(product);
-        }
+        foreach (var product in products) session.Store(product);
 
         await session.SaveChangesAsync();
         Console.WriteLine($"✅ Seeded {products.Count} products");
     }
 
     /// <summary>
-    /// Seed sample bank accounts (event sourcing)
+    ///     Seed sample bank accounts (event sourcing)
     /// </summary>
     public static async Task SeedBankAccountsAsync(IDocumentStore store, int count = 5)
     {
         var names = new[] { "Hermann Smith", "Alice Johnson", "Bob Williams", "Charlie Brown", "Diana Davis" };
         var descriptions = new[] { "Salary", "Bonus", "Rent", "Groceries", "Utilities", "Shopping" };
 
-        for (int i = 0; i < Math.Min(count, names.Length); i++)
+        for (var i = 0; i < Math.Min(count, names.Length); i++)
         {
             await using var session = store.LightweightSession();
 
@@ -109,13 +99,12 @@ public static class DataSeeder
 
             // Add random transactions
             var transactionCount = Random.Shared.Next(3, 10);
-            for (int j = 0; j < transactionCount; j++)
+            for (var j = 0; j < transactionCount; j++)
             {
                 var amount = Random.Shared.Next(50, 500);
                 var description = descriptions[Random.Shared.Next(descriptions.Length)];
 
                 if (Random.Shared.Next(0, 2) == 0)
-                {
                     // Deposit
                     session.Events.Append(
                         accountId,
@@ -126,9 +115,7 @@ public static class DataSeeder
                             DateTime.UtcNow.AddDays(-Random.Shared.Next(1, 30))
                         )
                     );
-                }
                 else
-                {
                     // Withdrawal
                     session.Events.Append(
                         accountId,
@@ -139,7 +126,6 @@ public static class DataSeeder
                             DateTime.UtcNow.AddDays(-Random.Shared.Next(1, 30))
                         )
                     );
-                }
             }
 
             await session.SaveChangesAsync();
@@ -149,7 +135,7 @@ public static class DataSeeder
     }
 
     /// <summary>
-    /// Seed all sample data
+    ///     Seed all sample data
     /// </summary>
     public static async Task SeedAllAsync(IDocumentStore store)
     {
@@ -164,7 +150,8 @@ public static class DataSeeder
 
     private static List<string> GetRandomTags()
     {
-        var allTags = new[] { "electronics", "office", "home", "tech", "productivity", "comfort", "wireless", "ergonomic" };
+        var allTags = new[]
+            { "electronics", "office", "home", "tech", "productivity", "comfort", "wireless", "ergonomic" };
         var count = Random.Shared.Next(1, 4);
         return allTags.OrderBy(_ => Random.Shared.Next()).Take(count).ToList();
     }

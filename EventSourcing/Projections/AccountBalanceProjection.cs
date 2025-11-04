@@ -1,4 +1,4 @@
-using Marten.Events.Projections;
+using Marten.Events.Aggregation;
 using MartenDemo.EventSourcing.Events;
 
 namespace MartenDemo.EventSourcing.Projections;
@@ -14,39 +14,37 @@ public class AccountBalance
     public bool IsClosed { get; set; }
 }
 
-// Projection definition - updates AccountBalance document from events
-public class AccountBalanceProjection : SingleStreamProjection<AccountBalance>
+// Projection definition using SingleStreamProjection
+public class AccountBalanceProjection : SingleStreamProjection<AccountBalance, Guid>
 {
-    // Create document when stream starts
-    public AccountBalance Create(AccountOpened e)
+    public AccountBalance Create(AccountOpened evt)
     {
         return new AccountBalance
         {
-            Id = e.AccountId,
-            AccountNumber = e.AccountNumber,
-            OwnerName = e.OwnerName,
-            Balance = e.InitialBalance,
-            LastModified = e.OpenedAt,
+            Id = evt.AccountId,
+            AccountNumber = evt.AccountNumber,
+            OwnerName = evt.OwnerName,
+            Balance = evt.InitialBalance,
+            LastModified = evt.OpenedAt,
             IsClosed = false
         };
     }
 
-    // Update document when events occur
-    public void Apply(MoneyDeposited e, AccountBalance view)
+    public void Apply(MoneyDeposited evt, AccountBalance view)
     {
-        view.Balance += e.Amount;
-        view.LastModified = e.DepositedAt;
+        view.Balance += evt.Amount;
+        view.LastModified = evt.DepositedAt;
     }
 
-    public void Apply(MoneyWithdrawn e, AccountBalance view)
+    public void Apply(MoneyWithdrawn evt, AccountBalance view)
     {
-        view.Balance -= e.Amount;
-        view.LastModified = e.WithdrawnAt;
+        view.Balance -= evt.Amount;
+        view.LastModified = evt.WithdrawnAt;
     }
 
-    public void Apply(AccountClosed e, AccountBalance view)
+    public void Apply(AccountClosed evt, AccountBalance view)
     {
         view.IsClosed = true;
-        view.LastModified = e.ClosedAt;
+        view.LastModified = evt.ClosedAt;
     }
 }
