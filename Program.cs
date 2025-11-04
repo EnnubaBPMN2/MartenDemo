@@ -1,6 +1,8 @@
 ﻿using JasperFx;
 using Marten;
 using Marten.Events.Projections;
+using Marten.Exceptions;
+using Marten.Schema;
 using MartenDemo.EventSourcing.Aggregates;
 using MartenDemo.EventSourcing.Events;
 using MartenDemo.EventSourcing.Projections;
@@ -12,6 +14,7 @@ using Microsoft.Extensions.Configuration;
 // This application demonstrates concepts from all tutorial chapters
 // Run it to explore Marten features interactively
 
+[UseOptimisticConcurrency]
 public record User
 {
     public Guid Id { get; init; }
@@ -393,59 +396,78 @@ internal class Program
             var user = new User { Id = userId, Name = "Concurrency Test", Email = "concurrency@example.com" };
             session.Store(user);
             await session.SaveChangesAsync();
-            Console.WriteLine("✅ Created test user\n");
+            Console.WriteLine("✅ Created test user (User record has [UseOptimisticConcurrency] attribute)\n");
         }
 
         // Simulate concurrent update attempt
-        Console.WriteLine("1️⃣  Attempting concurrent updates with concurrency check...");
+        Console.WriteLine("1️⃣  Simulating two concurrent updates to the same user...");
+        Console.WriteLine("    (Both tasks load the same version, then try to save changes)\n");
 
         var task1 = Task.Run(async () =>
         {
             await using var session = _store!.LightweightSession();
-            
+
             var user = await session.LoadAsync<User>(userId);
-            await Task.Delay(100); // Simulate processing time
+            await Task.Delay(50); // Simulate processing time
 
             var updated = user! with { Name = "Updated by Task 1" };
             session.Store(updated);
-            session.VersionFor(updated); // Track version for concurrency
 
             try
             {
                 await session.SaveChangesAsync();
-                return "Task 1: Success ✅";
+                return "Task 1: ✅ Update succeeded";
             }
-            catch (Exception ex) when (ex.Message.Contains("concurrency") || ex.Message.Contains("conflict"))
+            catch (ConcurrencyException)
             {
-                return "Task 1: Conflict detected ❌";
+                return "Task 1: ❌ Concurrency conflict detected!";
+            }
+            catch (Exception ex)
+            {
+                return $"Task 1: ⚠️  Unexpected error: {ex.GetType().Name}";
             }
         });
 
         var task2 = Task.Run(async () =>
         {
             await using var session = _store!.LightweightSession();
-            
+
             var user = await session.LoadAsync<User>(userId);
-            await Task.Delay(100); // Simulate processing time
+            await Task.Delay(100); // Simulate slightly longer processing time
 
             var updated = user! with { Name = "Updated by Task 2" };
             session.Store(updated);
-            session.VersionFor(updated); // Track version for concurrency
 
             try
             {
                 await session.SaveChangesAsync();
-                return "Task 2: Success ✅";
+                return "Task 2: ✅ Update succeeded";
             }
-            catch (Exception ex) when (ex.Message.Contains("concurrency") || ex.Message.Contains("conflict"))
+            catch (ConcurrencyException)
             {
-                return "Task 2: Conflict detected ❌";
+                return "Task 2: ❌ Concurrency conflict detected!";
+            }
+            catch (Exception ex)
+            {
+                return $"Task 2: ⚠️  Unexpected error: {ex.GetType().Name}";
             }
         });
 
         var results = await Task.WhenAll(task1, task2);
-        foreach (var result in results) Console.WriteLine($"   {result}");
-        Console.WriteLine("\n💡 Both tasks succeeded (no conflict detection in this simple demo)\n");
+        foreach (var result in results)
+        {
+            Console.WriteLine($"   {result}");
+        }
+
+        // Show final state
+        await using (var session = _store!.LightweightSession())
+        {
+            var finalUser = await session.LoadAsync<User>(userId);
+            Console.WriteLine($"\n📊 Final state: {finalUser!.Name}");
+        }
+
+        Console.WriteLine("\n💡 Note: With [UseOptimisticConcurrency], Marten detects when two sessions");
+        Console.WriteLine("   try to update the same document version, preventing lost updates.\n");
 
         // Cleanup
         await using (var session = _store!.LightweightSession())
